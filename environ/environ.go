@@ -7,6 +7,7 @@
 package environ
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"regexp"
 	"sort"
@@ -49,6 +50,7 @@ func Repo(repo *drone.Repo) map[string]string {
 		"DRONE_GIT_SSH_URL":     repo.SSHURL,
 		"DRONE_REPO_VISIBILITY": repo.Visibility,
 		"DRONE_REPO_PRIVATE":    fmt.Sprint(repo.Private),
+		"DRONE_REPO_TOKEN":      hashOf("repo", repo.ID, repo.UserID, repo.Slug),
 
 		// these are legacy configuration parameters for backward
 		// compatibility with drone 0.8. These are deprecated and
@@ -79,6 +81,7 @@ func Stage(stage *drone.Stage) map[string]string {
 		"DRONE_STAGE_STARTED":    fmt.Sprint(stage.Started),
 		"DRONE_STAGE_FINISHED":   fmt.Sprint(stage.Stopped),
 		"DRONE_STAGE_DEPENDS_ON": strings.Join(stage.DependsOn, ","),
+		"DRONE_STAGE_TOKEN":      hashOf("stage", stage.BuildID, stage.ID),
 	}
 	if isStageFailing(stage) {
 		env["DRONE_STAGE_STATUS"] = "failure"
@@ -139,6 +142,7 @@ func Build(build *drone.Build) map[string]string {
 		"DRONE_BUILD_CREATED":        fmt.Sprint(build.Created),
 		"DRONE_BUILD_STARTED":        fmt.Sprint(build.Started),
 		"DRONE_BUILD_FINISHED":       fmt.Sprint(build.Finished),
+		"DRONE_BUILD_TOKEN":          hashOf("build", build.RepoID, build.ID),
 		"DRONE_DEPLOY_TO":            build.Deploy,
 		"DRONE_DEPLOY_ID":            fmt.Sprint(build.DeployID),
 
@@ -312,4 +316,12 @@ func failedStages(build *drone.Build) []string {
 		}
 	}
 	return stages
+}
+
+func hashOf(vals ...interface{}) string {
+	h := sha256.New()
+	for _, val := range vals {
+		fmt.Fprint(h, val, ";")
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
